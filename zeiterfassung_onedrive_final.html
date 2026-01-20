@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeiterfassung</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.0.0/lib/msal-browser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #1d1d1f;
+            font-size: 2em;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #1d1d1f;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            color: #1d1d1f;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #1d1d1f;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #0071e3;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        button {
+            background: #0071e3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #0077ed;
+        }
+
+        .btn-secondary {
+            background: #86868b;
+        }
+
+        .btn-secondary:hover {
+            background: #6e6e73;
+        }
+
+        .btn-danger {
+            background: #ff3b30;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-danger:hover {
+            background: #ff453a;
+        }
+
+        .btn-success {
+            background: #34c759;
+        }
+
+        .btn-success:hover {
+            background: #30d158;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .time-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .entry-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .entry-item h4 {
+            color: #1d1d1f;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .entry-item p {
+            color: #86868b;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+
+        .entry-item p strong {
+            color: #1d1d1f;
+        }
+
+        .total {
+            background: #34c759;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .admin-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e5e5ea;
+        }
+
+        .admin-card h4 {
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .admin-card p {
+            color: #86868b;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+
+        .admin-card button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            margin-right: 8px;
+        }
+
+        .admin-card .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        .status-admin {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-employee {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 18px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .stat-card p {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .warning-box p {
+            color: #856404;
+            font-size: 14px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏱️ Zeiterfassung</h1>
+
+        <!-- Login Screen -->
+        <div id="loginScreen" class="card">
+            <h2>Anmeldung</h2>
+            
+            <div class="form-group">
+                <label for="loginName">Name:</label>
+                <input type="text" id="loginName" placeholder="Ihr Name">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Passwort:</label>
+                <input type="password" id="loginPassword" placeholder="Passwort" onkeypress="if(event.key==='Enter') login()">
+            </div>
+            <button onclick="login()" id="loginBtn">Anmelden</button>
+        </div>
+
+        <!-- Main App -->
+        <div id="mainApp" class="hidden">
+            <div class="card">
+                <div class="header-actions">
+                    <h2><span id="userName"></span></h2>
+                    <button onclick="logout()" class="btn-secondary">Abmelden</button>
+                </div>
+
+                <h3>Arbeitszeit erfassen</h3>
+                
+                <div class="form-group">
+                    <label for="workDate">Datum:</label>
+                    <input type="date" id="workDate">
+                </div>
+
+                <div class="time-grid">
+                    <div class="form-group">
+                        <label for="startTime">Beginn:</label>
+                        <input type="time" id="startTime">
+                    </div>
+                    <div class="form-group">
+                        <label for="pauseMinutes">Pause (Min):</label>
+                        <input type="number" id="pauseMinutes" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="endTime">Ende:</label>
+                        <input type="time" id="endTime">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Tätigkeitsbeschreibung:</label>
+                    <textarea id="description" placeholder="Was haben Sie gemacht?"></textarea>
+                </div>
+
+                <button onclick="addTimeEntry()" id="addEntryBtn">Speichern</button>
+            </div>
+
+            <div class="card">
+                <h3>Ihre Zeiten</h3>
+                
+                <div class="total">
+                    <p>Gesamt:</p>
+                    <div id="totalHours">0 Std</div>
+                </div>
+
+                <div id="entryList"></div>
+            </div>
+
+            <!-- Admin Dashboard -->
+            <div id="adminDashboard" class="hidden">
+                <div class="card">
+                    <h2>Admin</h2>
+
+                    <div class="warning-box">
+                        <p><strong>💾 Wichtig:</strong> Regelmäßig Excel exportieren! Daten werden nur im Browser gespeichert.</p>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h4>Mitarbeiter</h4>
+                            <p id="statEmployees">0</p>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #34c759 0%, #30d158 100%);">
+                            <h4>Gesamtstunden</h4>
+                            <p id="statTotalHours">0</p>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ff9500 0%, #ff3b30 100%);">
+                            <h4>Einträge</h4>
+                            <p id="statEntries">0</p>
+                        </div>
+                    </div>
+
+                    <h3>Mitarbeiter</h3>
+                    <button onclick="openAddEmployeeModal()">+ Mitarbeiter</button>
+                    <button onclick="exportAllToExcel()" class="btn-success" style="margin-left: 10px;">📊 Excel exportieren</button>
+
+                    <div class="admin-grid" id="employeeList"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Alle Zeiten</h3>
+                    <div id="allEmployeesOverview"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Employee Modal -->
+        <div id="addEmployeeModal" class="modal">
+            <div class="modal-content">
+                <h2>Mitarbeiter anlegen</h2>
+                
+                <div class="form-group">
+                    <label for="newEmployeeName">Name:</label>
+                    <input type="text" id="newEmployeeName" placeholder="Name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="newEmployeePassword">Passwort:</label>
+                    <input type="password" id="newEmployeePassword" placeholder="Passwort">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="newEmployeeAdmin" style="width: auto; margin-right: 8px;">
+                        Admin-Rechte
+                    </label>
+                </div>
+
+                <button onclick="addNewEmployee()">Speichern</button>
+                <button onclick="closeAddEmployeeModal()" class="btn-secondary" style="margin-left: 10px;">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== MICROSOFT ONEDRIVE CONFIG =====
+        const msalConfig = {
+            auth: {
+                clientId: '2a954c34-1ed5-46b9-a585-554acf407536',
+                authority: 'https://login.microsoftonline.com/11af2344-7631-4746-83e1-2d69986b8565',
+                redirectUri: 'https://vrlogic1.github.io/mitarbeitertool/'
+            },
+            cache: {
+                cacheLocation: 'sessionStorage',
+                storeAuthStateInCookie: false
+            }
+        };
+
+        let msalInstance = null;
+        let isOneDriveConnected = false;
+        const ONEDRIVE_FILE = 'Zeiterfassung_Datenbank.xlsx';
+
+        // Initialize MSAL
+        async function initMSAL() {
+            try {
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+                
+                // Handle redirect response
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    console.log('Login successful!');
+                    isOneDriveConnected = true;
+                    
+                    // Load data from OneDrive after successful login
+                    await loadFromOneDrive();
+                }
+                
+                // Check if already logged in
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    isOneDriveConnected = true;
+                    console.log('Already logged in');
+                }
+            } catch (error) {
+                console.error('MSAL initialization error:', error);
+            }
+        }
+
+        // Get access token
+        async function getAccessToken() {
+            const accounts = msalInstance.getAllAccounts();
+            
+            if (accounts.length === 0) {
+                // Need to login
+                await msalInstance.loginRedirect({
+                    scopes: ['Files.ReadWrite.All']
+                });
+                return null;
+            }
+
+            try {
+                const response = await msalInstance.acquireTokenSilent({
+                    scopes: ['Files.ReadWrite.All'],
+                    account: accounts[0]
+                });
+                return response.accessToken;
+            } catch (error) {
+                // Silent token acquisition failed, try interactive
+                await msalInstance.loginRedirect({
+                    scopes: ['Files.ReadWrite.All']
+                });
+                return null;
+            }
+        }
+
+        // Load data from OneDrive
+        async function loadFromOneDrive() {
+            try {
+                const token = await getAccessToken();
+                if (!token) return false;
+
+                const fileUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/Zeiterfassung/${ONEDRIVE_FILE}:/content`;
+                const response = await fetch(fileUrl, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        console.log('File not found, will create on first save');
+                        return false;
+                    }
+                    throw new Error('Load failed: ' + response.status);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+                // Load employees
+                if (workbook.SheetNames.includes('Mitarbeiter')) {
+                    const sheet = workbook.Sheets['Mitarbeiter'];
+                    const data = XLSX.utils.sheet_to_json(sheet);
+                    
+                    employees = {
+                        'Christian': { password: 'vrlogic', isAdmin: true }
+                    };
+                    
+                    data.forEach(row => {
+                        if (row.Name && row.Passwort) {
+                            employees[row.Name] = {
+                                password: row.Passwort,
+                                isAdmin: row.Admin === 'Ja' || row.Admin === true
+                            };
+                        }
+                    });
+                }
+
+                // Load time entries
+                if (workbook.SheetNames.includes('Zeiteinträge')) {
+                    const sheet = workbook.Sheets['Zeiteinträge'];
+                    const data = XLSX.utils.sheet_to_json(sheet);
+                    
+                    timeEntries = {};
+                    
+                    data.forEach(row => {
+                        if (row.Mitarbeiter && row.Datum) {
+                            if (!timeEntries[row.Mitarbeiter]) {
+                                timeEntries[row.Mitarbeiter] = [];
+                            }
+                            
+                            timeEntries[row.Mitarbeiter].push({
+                                id: row.ID || Date.now(),
+                                date: row.Datum,
+                                startTime: row.Beginn,
+                                endTime: row.Ende,
+                                pauseMinutes: row.Pause || 0,
+                                hours: row.Stunden,
+                                description: row.Beschreibung || ''
+                            });
+                        }
+                    });
+                }
+
+                console.log('✅ Data loaded from OneDrive');
+                return true;
+
+            } catch (error) {
+                console.error('OneDrive load error:', error);
+                return false;
+            }
+        }
+
+        // Save data to OneDrive
+        async function saveToOneDrive() {
+            try {
+                const token = await getAccessToken();
+                if (!token) {
+                    console.log('No token, cannot save');
+                    return false;
+                }
+
+                // Create workbook
+                const workbook = XLSX.utils.book_new();
+
+                // Mitarbeiter Sheet
+                const employeeData = [['Name', 'Passwort', 'Admin']];
+                Object.keys(employees).forEach(name => {
+                    employeeData.push([
+                        name,
+                        employees[name].password,
+                        employees[name].isAdmin ? 'Ja' : 'Nein'
+                    ]);
+                });
+                const employeeSheet = XLSX.utils.aoa_to_sheet(employeeData);
+                XLSX.utils.book_append_sheet(workbook, employeeSheet, 'Mitarbeiter');
+
+                // Zeiteinträge Sheet
+                const timeData = [['ID', 'Mitarbeiter', 'Datum', 'Beginn', 'Ende', 'Pause', 'Stunden', 'Beschreibung']];
+                Object.keys(timeEntries).forEach(username => {
+                    timeEntries[username].forEach(entry => {
+                        timeData.push([
+                            entry.id,
+                            username,
+                            entry.date,
+                            entry.startTime,
+                            entry.endTime,
+                            entry.pauseMinutes,
+                            entry.hours,
+                            entry.description
+                        ]);
+                    });
+                });
+                const timeSheet = XLSX.utils.aoa_to_sheet(timeData);
+                XLSX.utils.book_append_sheet(workbook, timeSheet, 'Zeiteinträge');
+
+                // Convert to blob
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                const blob = new Blob([excelBuffer], { 
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                });
+
+                // Upload to OneDrive
+                const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/Zeiterfassung/${ONEDRIVE_FILE}:/content`;
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    },
+                    body: blob
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error('Upload failed: ' + uploadResponse.status);
+                }
+
+                console.log('✅ Data saved to OneDrive');
+                return true;
+
+            } catch (error) {
+                console.error('OneDrive save error:', error);
+                alert('⚠️ OneDrive-Speicherung fehlgeschlagen.\n\nBitte Excel-Export nutzen!');
+                return false;
+            }
+        }
+
+        // ===== STATE =====
+        let currentUser = null;
+        let employees = {
+            'Christian': {
+                password: 'vrlogic',
+                isAdmin: true
+            }
+        };
+        let timeEntries = {};
+
+        // ===== INIT =====
+        window.addEventListener('load', async () => {
+            await initMSAL();
+            
+            // Try to load from OneDrive first
+            const loaded = await loadFromOneDrive();
+            if (!loaded) {
+                console.log('No OneDrive data, using defaults');
+            }
+        });
+
+        // ===== LOGIN =====
+        function login() {
+            const name = document.getElementById('loginName').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!name || !password) {
+                alert('Bitte Name und Passwort eingeben!');
+                return;
+            }
+
+            if (!employees[name] || employees[name].password !== password) {
+                alert('Falscher Name oder Passwort!');
+                return;
+            }
+
+            currentUser = name;
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('userName').textContent = name;
+            
+            if (employees[name].isAdmin) {
+                document.getElementById('adminDashboard').classList.remove('hidden');
+                loadAdminDashboard();
+            }
+
+            document.getElementById('workDate').valueAsDate = new Date();
+            displayEntries();
+            calculateTotal();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('adminDashboard').classList.add('hidden');
+            document.getElementById('loginName').value = '';
+            document.getElementById('loginPassword').value = '';
+        }
+
+        // ===== TIME ENTRY =====
+        function calculateWorkTime() {
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            const pause = parseInt(document.getElementById('pauseMinutes').value) || 0;
+
+            if (!start || !end) return null;
+
+            const startTime = new Date(`2000-01-01T${start}`);
+            const endTime = new Date(`2000-01-01T${end}`);
+            
+            let diffMs = endTime - startTime;
+            if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+            
+            const diffMinutes = diffMs / (1000 * 60) - pause;
+            return diffMinutes / 60;
+        }
+
+        function addTimeEntry() {
+            const date = document.getElementById('workDate').value;
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            const pause = parseInt(document.getElementById('pauseMinutes').value) || 0;
+            const description = document.getElementById('description').value.trim();
+
+            if (!date || !start || !end || !description) {
+                alert('Bitte füllen Sie alle Felder aus!');
+                return;
+            }
+
+            const hours = calculateWorkTime();
+            if (hours === null || hours <= 0) {
+                alert('Ungültige Zeitangaben!');
+                return;
+            }
+
+            if (!timeEntries[currentUser]) {
+                timeEntries[currentUser] = [];
+            }
+
+            timeEntries[currentUser].push({
+                id: Date.now(),
+                date,
+                startTime: start,
+                endTime: end,
+                pauseMinutes: pause,
+                hours: hours.toFixed(2),
+                description
+            });
+
+            await saveToOneDrive();
+
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+            document.getElementById('pauseMinutes').value = '0';
+            document.getElementById('description').value = '';
+
+            displayEntries();
+            calculateTotal();
+            
+            if (employees[currentUser]?.isAdmin) {
+                loadAdminDashboard();
+            }
+        }
+
+        function deleteEntry(id) {
+            if (!confirm('Eintrag wirklich löschen?')) return;
+
+            timeEntries[currentUser] = timeEntries[currentUser].filter(e => e.id !== id);
+            saveToOneDrive();
+
+            displayEntries();
+            calculateTotal();
+            
+            if (employees[currentUser]?.isAdmin) {
+                loadAdminDashboard();
+            }
+        }
+
+        function displayEntries() {
+            const list = document.getElementById('entryList');
+            
+            if (!timeEntries[currentUser] || timeEntries[currentUser].length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Noch keine Einträge</p>';
+                return;
+            }
+
+            const sorted = [...timeEntries[currentUser]].sort((a, b) => 
+                new Date(b.date) - new Date(a.date)
+            );
+
+            list.innerHTML = sorted.map(entry => `
+                <div class="entry-item">
+                    <h4>${new Date(entry.date).toLocaleDateString('de-DE', { 
+                        weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' 
+                    })}</h4>
+                    <p><strong>Zeit:</strong> ${entry.startTime} - ${entry.endTime} ${entry.pauseMinutes > 0 ? `(${entry.pauseMinutes} Min Pause)` : ''}</p>
+                    <p><strong>Stunden:</strong> ${entry.hours}</p>
+                    <p><strong>Tätigkeit:</strong> ${entry.description}</p>
+                    <button onclick="deleteEntry(${entry.id})" class="btn-danger">Löschen</button>
+                </div>
+            `).join('');
+        }
+
+        function calculateTotal() {
+            if (!timeEntries[currentUser]) {
+                document.getElementById('totalHours').textContent = '0 Std';
+                return;
+            }
+
+            const total = timeEntries[currentUser].reduce((sum, entry) => 
+                sum + parseFloat(entry.hours), 0
+            );
+
+            document.getElementById('totalHours').textContent = total.toFixed(1) + ' Std';
+        }
+
+        // ===== EMPLOYEE MANAGEMENT =====
+        function openAddEmployeeModal() {
+            document.getElementById('addEmployeeModal').classList.add('active');
+        }
+
+        function closeAddEmployeeModal() {
+            document.getElementById('addEmployeeModal').classList.remove('active');
+            document.getElementById('newEmployeeName').value = '';
+            document.getElementById('newEmployeePassword').value = '';
+            document.getElementById('newEmployeeAdmin').checked = false;
+        }
+
+        function addNewEmployee() {
+            const name = document.getElementById('newEmployeeName').value.trim();
+            const password = document.getElementById('newEmployeePassword').value;
+            const isAdmin = document.getElementById('newEmployeeAdmin').checked;
+
+            if (!name || !password) {
+                alert('Bitte Name und Passwort eingeben!');
+                return;
+            }
+
+            if (employees[name]) {
+                alert('Mitarbeiter existiert bereits!');
+                return;
+            }
+
+            employees[name] = {
+                password: password,
+                isAdmin: isAdmin
+            };
+
+            await saveToOneDrive();
+            closeAddEmployeeModal();
+            loadAdminDashboard();
+            alert(`✅ Mitarbeiter "${name}" wurde angelegt!`);
+        }
+
+        function deleteEmployee(name) {
+            if (name === currentUser) {
+                alert('Sie können sich nicht selbst löschen!');
+                return;
+            }
+
+            if (!confirm(`"${name}" wirklich löschen?\n\nAlle Zeiteinträge werden gelöscht!`)) {
+                return;
+            }
+
+            delete employees[name];
+            if (timeEntries[name]) {
+                delete timeEntries[name];
+            }
+            
+            await saveToOneDrive();
+            loadAdminDashboard();
+            alert(`Mitarbeiter "${name}" wurde gelöscht.`);
+        }
+
+        function resetPassword(name) {
+            const newPassword = prompt(`Neues Passwort für "${name}":`);
+            if (!newPassword) return;
+
+            employees[name].password = newPassword;
+            saveToOneDrive();
+            alert(`✅ Passwort geändert.`);
+        }
+
+        // ===== ADMIN DASHBOARD =====
+        function loadAdminDashboard() {
+            const totalEmployees = Object.keys(employees).length;
+            let totalHours = 0;
+            let totalEntriesCount = 0;
+
+            Object.values(timeEntries).forEach(entries => {
+                entries.forEach(entry => {
+                    totalHours += parseFloat(entry.hours);
+                    totalEntriesCount++;
+                });
+            });
+
+            document.getElementById('statEmployees').textContent = totalEmployees;
+            document.getElementById('statTotalHours').textContent = totalHours.toFixed(1);
+            document.getElementById('statEntries').textContent = totalEntriesCount;
+
+            const employeeListEl = document.getElementById('employeeList');
+            employeeListEl.innerHTML = Object.keys(employees).map(name => {
+                const emp = employees[name];
+                const entries = timeEntries[name] || [];
+                const hours = entries.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+
+                return `
+                    <div class="admin-card">
+                        <h4>${name}</h4>
+                        <span class="status ${emp.isAdmin ? 'status-admin' : 'status-employee'}">
+                            ${emp.isAdmin ? 'Admin' : 'Mitarbeiter'}
+                        </span>
+                        <p><strong>Einträge:</strong> ${entries.length}</p>
+                        <p><strong>Stunden:</strong> ${hours.toFixed(1)}</p>
+                        <button onclick="resetPassword('${name}')" class="btn-secondary">Passwort</button>
+                        <button onclick="deleteEmployee('${name}')" class="btn-danger">Löschen</button>
+                    </div>
+                `;
+            }).join('');
+
+            const overviewEl = document.getElementById('allEmployeesOverview');
+            overviewEl.innerHTML = Object.keys(timeEntries).map(username => {
+                const entries = timeEntries[username] || [];
+                if (entries.length === 0) return '';
+
+                const sorted = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+                const total = entries.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+
+                return `
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="color: #0071e3; margin-bottom: 12px;">${username} - ${total.toFixed(1)} Std</h4>
+                        ${sorted.slice(0, 5).map(entry => `
+                            <div class="entry-item">
+                                <h4>${new Date(entry.date).toLocaleDateString('de-DE', { 
+                                    weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' 
+                                })}</h4>
+                                <p><strong>Zeit:</strong> ${entry.startTime} - ${entry.endTime} ${entry.pauseMinutes > 0 ? `(${entry.pauseMinutes} Min Pause)` : ''}</p>
+                                <p><strong>Stunden:</strong> ${entry.hours}</p>
+                                <p><strong>Tätigkeit:</strong> ${entry.description}</p>
+                            </div>
+                        `).join('')}
+                        ${entries.length > 5 ? `<p style="color: #86868b; text-align: center; margin-top: 10px;">... und ${entries.length - 5} weitere</p>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ===== EXCEL EXPORT =====
+        function exportAllToExcel() {
+            const workbook = XLSX.utils.book_new();
+            
+            const entriesByMonth = {};
+            
+            Object.keys(timeEntries).forEach(user => {
+                timeEntries[user].forEach(entry => {
+                    const date = new Date(entry.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    const monthName = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+                    
+                    if (!entriesByMonth[monthKey]) {
+                        entriesByMonth[monthKey] = {
+                            name: monthName,
+                            entries: []
+                        };
+                    }
+                    
+                    entriesByMonth[monthKey].entries.push({
+                        user: user,
+                        date: entry.date,
+                        startTime: entry.startTime,
+                        pauseMinutes: entry.pauseMinutes,
+                        endTime: entry.endTime,
+                        hours: entry.hours,
+                        description: entry.description
+                    });
+                });
+            });
+            
+            const sortedMonths = Object.keys(entriesByMonth).sort();
+            
+            sortedMonths.forEach(monthKey => {
+                const monthData = entriesByMonth[monthKey];
+                monthData.entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                const sheetData = [
+                    [monthData.name],
+                    [],
+                    ['Mitarbeiter', 'Kalendertag', 'Beginn (Uhrzeit)', 'Pause (Dauer)', 'Ende (Uhrzeit)', 'Dauer (Summe)', 'Beschreibung']
+                ];
+                
+                let totalHours = 0;
+                
+                monthData.entries.forEach(entry => {
+                    const dateObj = new Date(entry.date);
+                    const formattedDate = dateObj.toLocaleDateString('de-DE', { 
+                        weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' 
+                    });
+                    
+                    sheetData.push([
+                        entry.user,
+                        formattedDate,
+                        entry.startTime,
+                        entry.pauseMinutes + ' Min',
+                        entry.endTime,
+                        entry.hours + ' Std',
+                        entry.description
+                    ]);
+                    
+                    totalHours += parseFloat(entry.hours);
+                });
+                
+                sheetData.push([]);
+                sheetData.push(['', '', '', '', 'GESAMT:', totalHours.toFixed(2) + ' Std', '']);
+                
+                const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+                sheet['!cols'] = [
+                    { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 12 },
+                    { wch: 15 }, { wch: 15 }, { wch: 40 }
+                ];
+                
+                const sheetName = monthData.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '');
+                XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+            });
+            
+            const summaryData = [
+                ['Zeiterfassung - Komplette Übersicht'],
+                ['Exportiert am: ' + new Date().toLocaleString('de-DE')],
+                [],
+                ['Mitarbeiter', 'Kalendertag', 'Beginn (Uhrzeit)', 'Pause (Dauer)', 'Ende (Uhrzeit)', 'Dauer (Summe)', 'Beschreibung', 'Monat']
+            ];
+            
+            const allEntriesSorted = [];
+            Object.keys(timeEntries).forEach(user => {
+                timeEntries[user].forEach(entry => {
+                    const date = new Date(entry.date);
+                    const monthName = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+                    allEntriesSorted.push({
+                        user: user,
+                        date: entry.date,
+                        startTime: entry.startTime,
+                        pauseMinutes: entry.pauseMinutes,
+                        endTime: entry.endTime,
+                        hours: entry.hours,
+                        description: entry.description,
+                        month: monthName
+                    });
+                });
+            });
+            
+            allEntriesSorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            allEntriesSorted.forEach(entry => {
+                const dateObj = new Date(entry.date);
+                const formattedDate = dateObj.toLocaleDateString('de-DE', { 
+                    weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' 
+                });
+                
+                summaryData.push([
+                    entry.user,
+                    formattedDate,
+                    entry.startTime,
+                    entry.pauseMinutes + ' Min',
+                    entry.endTime,
+                    entry.hours + ' Std',
+                    entry.description,
+                    entry.month
+                ]);
+            });
+            
+            const grandTotal = allEntriesSorted.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+            summaryData.push([]);
+            summaryData.push(['', '', '', '', 'GESAMT:', grandTotal.toFixed(2) + ' Std', '', '']);
+            
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            summarySheet['!cols'] = [
+                { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 12 },
+                { wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 20 }
+            ];
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Komplette Übersicht', true);
+            
+            const sheets = workbook.SheetNames;
+            const summaryIndex = sheets.indexOf('Komplette Übersicht');
+            if (summaryIndex > 0) {
+                sheets.splice(summaryIndex, 1);
+                sheets.unshift('Komplette Übersicht');
+            }
+            
+            const filename = `Zeiterfassung_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+            alert('✅ Excel exportiert: ' + filename);
+        }
+    </script>
+</body>
+</html>
